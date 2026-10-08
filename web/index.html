@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdgeSCADA - 现代工业中控调度与可视化大屏</title>
+    <style>
+        :root {
+            --bg-primary: #080e1a;
+            --bg-secondary: #0f172a;
+            --bg-card: #131d33;
+            --border-color: #233554;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --accent-glow: rgba(56, 189, 248, 0.35);
+            --green: #22c55e;
+            --yellow: #eab308;
+            --red: #ef4444;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            padding: 24px;
+            line-height: 1.5;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 24px;
+        }
+        .logo-area { display: flex; align-items: center; gap: 14px; }
+        .logo-badge {
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            color: white;
+            font-weight: 800;
+            font-size: 22px;
+            padding: 6px 16px;
+            border-radius: 8px;
+            letter-spacing: 1px;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+        .title h1 { font-size: 22px; font-weight: 600; }
+        .title p { font-size: 13px; color: var(--text-muted); }
+        .status-tags { display: flex; gap: 12px; }
+        .tag {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            background: rgba(19, 29, 51, 0.8);
+            border: 1px solid var(--border-color);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+        }
+        .dot { width: 8px; height: 8px; border-radius: 50%; }
+        .dot.green { background-color: var(--green); box-shadow: 0 0 8px var(--green); }
+        .dot.yellow { background-color: var(--yellow); box-shadow: 0 0 8px var(--yellow); }
+        .dot.red { background-color: var(--red); box-shadow: 0 0 8px var(--red); }
+
+        .metrics-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 18px;
+            margin-bottom: 24px;
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+        }
+        .card-title { font-size: 13px; color: var(--text-muted); font-weight: 500; margin-bottom: 8px; }
+        .card-value { font-size: 28px; font-weight: 700; color: var(--text-main); font-family: monospace; }
+        .card-desc { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+
+        /* ================= 核心：SCADA 设备动力学可视化区 ================= */
+        .scada-section { margin-bottom: 24px; }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+        .section-title { font-size: 16px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+        .section-tip { font-size: 12px; color: var(--text-muted); }
+
+        .turbines-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+            gap: 20px;
+        }
+
+        .turbine-card {
+            background: linear-gradient(180deg, #16223b 0%, #0f182b 100%);
+            border: 2px solid var(--border-color);
+            border-radius: 14px;
+            padding: 20px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            overflow: hidden;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        .turbine-card:hover {
+            border-color: var(--accent);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 24px rgba(56, 189, 248, 0.2);
+        }
+        .turbine-card.selected {
+            border-color: #38bdf8;
+            box-shadow: 0 0 25px rgba(56, 189, 248, 0.4);
+            background: linear-gradient(180deg, #1a2a4a 0%, #111e36 100%);
+        }
+        .turbine-card.placeholder {
+            border: 2px dashed #233554;
+            background: rgba(15, 23, 42, 0.4);
+            cursor: pointer;
+            opacity: 0.65;
+        }
+        .turbine-card.placeholder:hover {
+            opacity: 0.9;
+            border-color: #475569;
+            transform: none;
+            box-shadow: none;
+        }
+        .placeholder-badge {
+            font-size: 11px;
+            color: #94a3b8;
+            background: rgba(51, 65, 85, 0.4);
+            padding: 2px 8px;
+            border-radius: 4px;
+        }
+
+        /* 工业设备仪表与能量动力环 (通用电气/逆变/储能) */
+        .equip-vis {
+            width: 130px;
+            height: 130px;
+            flex-shrink: 0;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .rotor-ring {
+            transform-origin: 50% 50%;
+            animation: spin-cw 3s linear infinite;
+        }
+        .pulse-core {
+            animation: pulse-glow 2s ease-in-out infinite alternate;
+        }
+        @keyframes spin-cw {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+        @keyframes pulse-glow {
+            from { opacity: 0.6; filter: drop-shadow(0 0 2px #38bdf8); }
+            to { opacity: 1.0; filter: drop-shadow(0 0 10px #38bdf8); }
+        }
+
+        .equip-info { flex: 1; display: flex; flex-direction: column; gap: 8px; }
+        .equip-header { display: flex; justify-content: space-between; align-items: baseline; }
+        .equip-name { font-size: 17px; font-weight: 700; color: #fff; }
+        .equip-status { font-size: 11px; font-weight: 600; padding: 2px 6px; border-radius: 4px; }
+        .status-running { background: rgba(34, 197, 94, 0.2); color: #4ade80; }
+        .status-stopped { background: rgba(239, 68, 68, 0.2); color: #f87171; }
+
+        .telemetry-row { display: flex; justify-content: space-between; align-items: center; font-size: 13px; }
+        .telemetry-label { color: var(--text-muted); }
+        .telemetry-val { font-family: monospace; font-size: 15px; font-weight: 700; color: #38bdf8; }
+
+        /* 底部详情面板 */
+        .detail-layout { display: grid; grid-template-columns: 2fr 1fr; gap: 20px; margin-bottom: 24px; }
+        @media (max-width: 900px) { .detail-layout { grid-template-columns: 1fr; } }
+
+        .search-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            width: 220px;
+        }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 13px; }
+        th {
+            background-color: rgba(8, 14, 26, 0.7);
+            padding: 10px 14px;
+            color: var(--text-muted);
+            border-bottom: 1px solid var(--border-color);
+        }
+        td {
+            padding: 10px 14px;
+            border-bottom: 1px solid rgba(35, 53, 84, 0.6);
+        }
+        tr:hover { background-color: rgba(56, 189, 248, 0.05); }
+        .badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        .badge.good { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+        .badge.warn { background: rgba(234, 179, 8, 0.15); color: #facc15; }
+        .badge.danger { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+
+        .control-form { display: flex; flex-direction: column; gap: 12px; }
+        .form-group { display: flex; flex-direction: column; gap: 4px; }
+        .form-group label { font-size: 12px; color: var(--text-muted); }
+        .form-control {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+        }
+        .btn {
+            background: var(--accent);
+            color: #080e1a;
+            border: none;
+            padding: 10px 16px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            margin-top: 8px;
+        }
+        .btn:hover { background: #0284c7; color: white; }
+        .log-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 6px;
+            padding: 12px;
+            font-family: monospace;
+            font-size: 12px;
+            color: var(--text-muted);
+            max-height: 160px;
+            overflow-y: auto;
+            margin-top: 12px;
+        }
+
+        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+        @media (max-width: 900px) { .bottom-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div class="logo-area">
+            <div class="logo-badge">EdgeSCADA</div>
+            <div class="title">
+                <h1>EdgeSCADA Central Dispatcher</h1>
+                <p>工业 SCADA 监控中控 · 电力机电动力学监视 · 实时测点矩阵 · 越限告警与历史归档</p>
+            </div>
+        </div>
+        <div class="status-tags">
+            <div class="tag"><div id="dot-collector" class="dot green"></div>FEP 前置机: 在线</div>
+            <div class="tag"><div id="dot-sqlite" class="dot green"></div>SQLite3 归档: 正常</div>
+            <div class="tag"><div id="dot-alarm" class="dot green"></div>越限告警: 运行中</div>
+        </div>
+    </div>
+
+    <!-- 顶部四卡片运行统计 -->
+    <div class="metrics-grid">
+        <div class="card">
+            <div class="card-title">在线前置机 (Active FEPs)</div>
+            <div id="m-collectors" class="card-value">1</div>
+            <div class="card-desc">CompactPack 长连接状态</div>
+        </div>
+        <div class="card">
+            <div class="card-title">纳管设备总量 (Devices)</div>
+            <div id="m-devices" class="card-value">1</div>
+            <div class="card-desc">智能逆变器 / 机组实时接入</div>
+        </div>
+        <div class="card">
+            <div class="card-title">累计汇聚包 (Telemetry Packets)</div>
+            <div id="m-packets" class="card-value">0</div>
+            <div class="card-desc">KLV+Gzip 实时解包处理</div>
+        </div>
+        <div class="card">
+            <div class="card-title">SQLite 归档记录数 (Records)</div>
+            <div id="m-records" class="card-value">0</div>
+            <div class="card-desc">data/scada.db 持久化时序</div>
+        </div>
+    </div>
+
+    <!-- ================= 核心：SCADA 动力学设备大屏卡片区 ================= -->
+    <div class="scada-section">
+        <div class="section-header">
+            <div class="section-title">⚡ 现场机电动力学监视 (Dynamic Equipment Power Matrix)</div>
+            <div class="section-tip">💡 提示：点击设备卡片可切换下方全量测点与远程控制目标，转速与实时出力负荷成正比</div>
+        </div>
+        <div id="turbines-container" class="turbines-grid">
+            <!-- 动态渲染设备卡片与动力学叶轮 -->
+        </div>
+    </div>
+
+    <!-- 下方交互详情：当前选中设备的全量测点明细 + 远程控制 -->
+    <div class="detail-layout">
+        <!-- 实时详细测点表格 -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title" id="selected-device-title">📋 设备详细测点明细 (device_01)</div>
+                <input type="text" id="filter-input" class="search-box" placeholder="过滤测点名称...">
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>测点名称 (Tag)</th>
+                        <th>当前值 (Value)</th>
+                        <th>质量戳 (Quality)</th>
+                        <th>刷新时间 (Timestamp)</th>
+                    </tr>
+                </thead>
+                <tbody id="points-body">
+                    <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">正在汇聚前置机数据...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 针对该设备的集中控制 -->
+        <div class="card">
+            <div class="section-title">🎮 集中调度指令下发 (SCADA Control)</div>
+            <form id="control-form" class="control-form" onsubmit="return sendControl(event);" style="margin-top: 14px;">
+                <div class="form-group">
+                    <label>前置采集器 (FEP ID)</label>
+                    <input type="text" id="cmd-collector" class="form-control" value="collector_01" readonly style="opacity: 0.7;">
+                </div>
+                <div class="form-group">
+                    <label>目标设备 (Target Device)</label>
+                    <input type="text" id="cmd-device" class="form-control" value="device_01" readonly style="color: var(--accent); font-weight: 700;">
+                </div>
+                <div class="form-group">
+                    <label>控制点/动作标签</label>
+                    <input type="text" id="cmd-tag" class="form-control" value="setpoint_power">
+                </div>
+                <div class="form-group">
+                    <label>Modbus 功能码</label>
+                    <select id="cmd-fc" class="form-control">
+                        <option value="6">06: 写单个保持寄存器 (Holding Reg)</option>
+                        <option value="5">05: 写单个线圈 (Coil)</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>寄存器偏移地址 (Address)</label>
+                    <input type="number" id="cmd-addr" class="form-control" value="100">
+                </div>
+                <div class="form-group">
+                    <label>设定写入值 (Value)</label>
+                    <input type="number" step="any" id="cmd-val" class="form-control" value="1500">
+                </div>
+                <button type="submit" class="btn">中控立即路由下发</button>
+            </form>
+
+            <div class="section-title" style="margin-top: 18px; font-size: 13px;">下发执行轨迹</div>
+            <div id="cmd-log" class="log-box">就绪，等待下发指令...</div>
+        </div>
+    </div>
+
+    <!-- 底部：告警列表 + 历史归档 -->
+    <div class="bottom-grid">
+        <!-- 实时告警 -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">🚨 实时越限告警中心 (Alarms & Events)</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>级别</th>
+                        <th>设备</th>
+                        <th>测点</th>
+                        <th>说明</th>
+                        <th>当前值 / 阈值</th>
+                        <th>时间</th>
+                    </tr>
+                </thead>
+                <tbody id="alarms-body">
+                    <tr><td colspan="6" style="text-align:center; color: var(--text-muted);">系统正常，暂无活动告警</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 历史时序采样 -->
+        <div class="card">
+            <div class="section-header">
+                <div class="section-title">📈 SQLite 历史时序采样 (active_power)</div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>序号</th>
+                        <th>时间戳</th>
+                        <th>有功功率 (kW)</th>
+                        <th>存储介质</th>
+                    </tr>
+                </thead>
+                <tbody id="history-body">
+                    <tr><td colspan="4" style="text-align:center; color: var(--text-muted);">正在加载历史记录...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        let allPoints = [];
+        let selectedDeviceId = "device_01";
+
+        // 通用工业发电设备/智能逆变器/机电动力源 SVG 动态引擎 (带极性电枢与动态能量流转轮)
+        function renderIndustrialRotorSvg(power, isRunning) {
+            // 动画周期: 功率越高，外环电枢/转子旋转越飞快。0kW 时停转，1800kW 时极速旋转 (0.5s)
+            let duration = 0;
+            if (isRunning && power > 0) {
+                duration = Math.max(0.4, 4.0 - (power / 1800.0) * 3.6);
+            }
+            const animStyle = duration > 0 ? `style="animation: spin-cw ${duration.toFixed(2)}s linear infinite;"` : `style="animation: none;"`;
+
+            return `
+            <svg viewBox="0 0 100 100" width="100%" height="100%">
+                <!-- 外围工业设备防护与定子铁芯轮廓 -->
+                <circle cx="50" cy="50" r="44" fill="none" stroke="#233554" stroke-width="2.5" stroke-dasharray="3,3"/>
+                <circle cx="50" cy="50" r="38" fill="#10192e" stroke="#334155" stroke-width="2"/>
+                
+                <!-- 四象限磁极刻度标记 -->
+                <line x1="50" y1="8" x2="50" y2="13" stroke="#64748b" stroke-width="2"/>
+                <line x1="50" y1="87" x2="50" y2="92" stroke="#64748b" stroke-width="2"/>
+                <line x1="8" y1="50" x2="13" y2="50" stroke="#64748b" stroke-width="2"/>
+                <line x1="87" y1="50" x2="92" y2="50" stroke="#64748b" stroke-width="2"/>
+
+                <!-- 内部旋转电枢/涡流动力环 (随功率飞转) -->
+                <g class="rotor-ring" ${animStyle}>
+                    <!-- 6 组对称高能电枢齿爪/导流叶片 -->
+                    <circle cx="50" cy="50" r="28" fill="none" stroke="url(#rotor-grad)" stroke-width="4" stroke-dasharray="14 15.4"/>
+                    <line x1="50" y1="22" x2="50" y2="34" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="50" y1="66" x2="50" y2="78" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="26" y1="36" x2="36" y2="42" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="64" y1="58" x2="74" y2="64" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="26" y1="64" x2="36" y2="58" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                    <line x1="64" y1="42" x2="74" y2="36" stroke="#38bdf8" stroke-width="3" stroke-linecap="round"/>
+                </g>
+
+                <!-- 中心能量脉冲核 (Pulse Core) -->
+                <circle cx="50" cy="50" r="14" fill="#0f172a" stroke="#0284c7" stroke-width="2"/>
+                <circle class="pulse-core" cx="50" cy="50" r="8" fill="#38bdf8"/>
+                <circle cx="50" cy="50" r="4" fill="#ffffff"/>
+
+                <defs>
+                    <linearGradient id="rotor-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+                        <stop offset="0%" stop-color="#38bdf8"/>
+                        <stop offset="100%" stop-color="#0ea5e9"/>
+                    </linearGradient>
+                </defs>
+            </svg>`;
+        }
+
+        async function refreshData() {
+            try {
+                // 1. 获取运行状态与设备清单
+                const resStatus = await fetch('/api/status');
+                if (resStatus.ok) {
+                    const st = await resStatus.json();
+                    document.getElementById('m-collectors').innerText = st.collectors_count || 1;
+                    document.getElementById('m-devices').innerText = st.active_devices || 0;
+                    document.getElementById('m-packets').innerText = st.total_packets || 0;
+                    document.getElementById('m-records').innerText = (st.total_packets * 10) || 0;
+
+                    const dotCol = document.getElementById('dot-collector');
+                    dotCol.className = (st.collectors_count > 0) ? 'dot green' : 'dot red';
+                }
+
+                // 2. 获取实时测点
+                const resPoints = await fetch('/api/points');
+                if (resPoints.ok) {
+                    allPoints = await resPoints.json();
+                    renderEquipmentCards();
+                    renderPointsTable();
+                }
+
+                // 3. 获取实时告警
+                const resAlarms = await fetch('/api/alarms');
+                if (resAlarms.ok) {
+                    const alarms = await resAlarms.json();
+                    renderAlarms(alarms);
+                }
+
+                // 4. 获取历史时序采样
+                const resHistory = await fetch(`/api/history?device=${selectedDeviceId}&point=active_power`);
+                if (resHistory.ok) {
+                    const hist = await resHistory.json();
+                    renderHistory(hist);
+                }
+            } catch (err) {
+                console.error('Refresh error:', err);
+            }
+        }
+
+        // 渲染设备动力学卡片 (支持多机组)
+        function renderEquipmentCards() {
+            // 按 device 分组测点
+            const deviceMap = {};
+            for (const p of allPoints) {
+                const dev = p.device || "device_01";
+                if (!deviceMap[dev]) deviceMap[dev] = {};
+                deviceMap[dev][p.name] = p.value;
+            }
+
+            const container = document.getElementById('turbines-container');
+            const devices = Object.keys(deviceMap);
+            if (devices.length === 0) {
+                container.innerHTML = '<div style="color:var(--text-muted); padding:20px;">正在连接前置机获取设备信息...</div>';
+                return;
+            }
+
+            let html = '';
+            for (const dev of devices) {
+                const metrics = deviceMap[dev];
+                const power = metrics['active_power'] || 0;
+                const temp = metrics['inverter_temp'] || 0;
+                const freq = metrics['grid_frequency'] || 50.0;
+                const voltage = metrics['grid_voltage_a'] || 220.0;
+                const isRunning = (metrics['running_state'] !== undefined) ? (metrics['running_state'] > 0.5) : true;
+                const isSelected = (dev === selectedDeviceId);
+
+                html += `
+                <div class="turbine-card ${isSelected ? 'selected' : ''}" onclick="selectDevice('${dev}')">
+                    <div class="equip-vis">
+                        ${renderIndustrialRotorSvg(power, isRunning)}
+                    </div>
+                    <div class="equip-info">
+                        <div class="equip-header">
+                            <span class="equip-name">${dev}</span>
+                            <span class="equip-status ${isRunning ? 'status-running' : 'status-stopped'}">
+                                ${isRunning ? '● 在网运行' : '○ 停机备用'}
+                            </span>
+                        </div>
+                        <div class="telemetry-row">
+                            <span class="telemetry-label">有功功率 (Power)</span>
+                            <span class="telemetry-val" style="color: #38bdf8; font-size:17px;">${power.toFixed(1)} kW</span>
+                        </div>
+                        <div class="telemetry-row">
+                            <span class="telemetry-label">变流器温度 (Temp)</span>
+                            <span class="telemetry-val" style="color: ${temp > 45 ? '#f87171' : '#4ade80'};">${temp.toFixed(1)} ℃</span>
+                        </div>
+                        <div class="telemetry-row">
+                            <span class="telemetry-label">电网电压 / 工频</span>
+                            <span class="telemetry-val" style="color: var(--text-muted); font-size:12px;">${voltage.toFixed(1)}V / ${freq.toFixed(2)}Hz</span>
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            // 补充 2 个空置占位设备卡片 (可随时扩展接入新机组)
+            const placeholders = [
+                { id: "device_02 (备用机组)", desc: "2# 储能/变流机组 (待接入)" },
+                { id: "device_03 (预留机组)", desc: "3# 升压及配电机组 (预留通道)" }
+            ];
+
+            for (const ph of placeholders) {
+                html += `
+                <div class="turbine-card placeholder" title="预留通道，暂未上线">
+                    <div class="equip-vis">
+                        <svg viewBox="0 0 100 100" width="100%" height="100%">
+                            <circle cx="50" cy="50" r="42" fill="none" stroke="#334155" stroke-width="2" stroke-dasharray="4,4"/>
+                            <circle cx="50" cy="50" r="26" fill="none" stroke="#1e293b" stroke-width="2"/>
+                            <text x="50" y="55" text-anchor="middle" fill="#64748b" font-size="20" font-family="sans-serif">+</text>
+                        </svg>
+                    </div>
+                    <div class="equip-info">
+                        <div class="equip-header">
+                            <span class="equip-name" style="color: #94a3b8;">${ph.id}</span>
+                            <span class="placeholder-badge">未上线 / 待机</span>
+                        </div>
+                        <div style="font-size: 12px; color: #64748b; margin-top: 6px;">
+                            ${ph.desc}
+                        </div>
+                        <div style="font-size: 11px; color: #475569; margin-top: 10px; font-family: monospace;">
+                            FEP Channel: Standby (空置端口)
+                        </div>
+                    </div>
+                </div>`;
+            }
+
+            container.innerHTML = html;
+        }
+
+        // 切换选中设备
+        function selectDevice(devId) {
+            selectedDeviceId = devId;
+            document.getElementById('cmd-device').value = devId;
+            document.getElementById('selected-device-title').innerText = `📋 设备详细测点明细 (${devId})`;
+            renderEquipmentCards();
+            renderPointsTable();
+        }
+
+        // 渲染详细测点列表
+        function renderPointsTable() {
+            const filter = document.getElementById('filter-input').value.toLowerCase();
+            const tbody = document.getElementById('points-body');
+
+            // 过滤当前选中设备
+            const currentDevPoints = allPoints.filter(p => (p.device || "device_01") === selectedDeviceId);
+            const filtered = currentDevPoints.filter(p => p.name.toLowerCase().includes(filter));
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">暂无匹配测点</td></tr>';
+                return;
+            }
+
+            let html = '';
+            for (const p of filtered) {
+                const date = new Date(p.timestamp_ms);
+                const timeStr = date.toLocaleTimeString() + '.' + String(date.getMilliseconds()).padStart(3, '0');
+                const badge = '<span class="badge good">GOOD (192)</span>';
+
+                html += `<tr>
+                    <td><strong>${p.name}</strong></td>
+                    <td style="font-family: monospace; color: var(--accent); font-weight: 700; font-size: 14px;">${p.value.toFixed(2)}</td>
+                    <td>${badge}</td>
+                    <td style="color: var(--text-muted);">${timeStr}</td>
+                </tr>`;
+            }
+            tbody.innerHTML = html;
+        }
+
+        function renderAlarms(alarms) {
+            const tbody = document.getElementById('alarms-body');
+            if (!alarms || alarms.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; color: var(--text-muted);">系统一切正常，暂无活动告警</td></tr>';
+                return;
+            }
+
+            let html = '';
+            for (const a of alarms.slice(0, 8)) {
+                const date = new Date(a.ts);
+                const timeStr = date.toLocaleTimeString();
+                const badge = a.level === 'CRITICAL' ? '<span class="badge danger">CRITICAL</span>' : '<span class="badge warn">WARN</span>';
+
+                html += `<tr>
+                    <td>${badge}</td>
+                    <td>${a.device}</td>
+                    <td><strong>${a.point}</strong></td>
+                    <td>${a.message}</td>
+                    <td style="font-family: monospace;">${a.value.toFixed(1)} / ${a.threshold.toFixed(1)}</td>
+                    <td style="color: var(--text-muted);">${timeStr}</td>
+                </tr>`;
+            }
+            tbody.innerHTML = html;
+        }
+
+        function renderHistory(hist) {
+            const tbody = document.getElementById('history-body');
+            if (!hist || hist.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" style="text-align:center; color: var(--text-muted);">暂无历史时序数据</td></tr>';
+                return;
+            }
+
+            let html = '';
+            for (let i = 0; i < Math.min(hist.length, 8); ++i) {
+                const h = hist[i];
+                const date = new Date(h.ts);
+                const timeStr = date.toLocaleTimeString() + '.' + String(date.getMilliseconds()).padStart(3, '0');
+                html += `<tr>
+                    <td style="color: var(--text-muted);">${i + 1}</td>
+                    <td style="color: var(--text-muted);">${timeStr}</td>
+                    <td style="font-family: monospace; color: #38bdf8; font-weight: 600;">${h.value.toFixed(2)}</td>
+                    <td><span class="badge good">SQLite WAL</span></td>
+                </tr>`;
+            }
+            tbody.innerHTML = html;
+        }
+
+        document.getElementById('filter-input').addEventListener('input', renderPointsTable);
+
+        async function sendControl(e) {
+            e.preventDefault();
+            const body = {
+                collector_id: document.getElementById('cmd-collector').value,
+                device_id: document.getElementById('cmd-device').value,
+                tag_name: document.getElementById('cmd-tag').value,
+                fc: parseInt(document.getElementById('cmd-fc').value),
+                address: parseInt(document.getElementById('cmd-addr').value),
+                value: parseFloat(document.getElementById('cmd-val').value)
+            };
+
+            const logBox = document.getElementById('cmd-log');
+            logBox.innerText = `[${new Date().toLocaleTimeString()}] 中控路由转发中: ${JSON.stringify(body)}...\n` + logBox.innerText;
+
+            try {
+                const res = await fetch('/api/control', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+                const result = await res.json();
+                logBox.innerText = `[${new Date().toLocaleTimeString()}] 下发结果: ${result.status} (已持久化控制日志到 SQLite)\n` + logBox.innerText;
+            } catch (err) {
+                logBox.innerText = `[${new Date().toLocaleTimeString()}] 异常: ${err.message}\n` + logBox.innerText;
+            }
+            return false;
+        }
+
+        // 每秒自动拉取并刷新
+        setInterval(refreshData, 1000);
+        refreshData();
+    </script>
+</body>
+</html>

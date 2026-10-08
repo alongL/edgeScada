@@ -1,0 +1,26 @@
+[
+  {
+    "id": "device_01",
+    "name": "Solar_Inverter_01",
+    "ip": "127.0.0.1",
+    "port": 1502,
+    "slave_id": 1,
+    "interval_ms": 1000,
+    "align_second": true,
+    "max_gap": 20,
+    "max_regs_per_req": 120,
+    "template": "templates/inverter_template.csv"
+  },
+  {
+    "id": "device_02",
+    "name": "Solar_Inverter_02",
+    "ip": "127.0.0.1",
+    "port": 1502,
+    "slave_id": 2,
+    "interval_ms": 1000,
+    "align_second": true,
+    "max_gap": 20,
+    "max_regs_per_req": 120,
+    "template": "templates/inverter_template.csv"
+  }
+]

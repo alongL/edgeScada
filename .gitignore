@@ -1,0 +1,13 @@
+build/
+bin/
+*.o
+*.a
+*.so
+.vscode/
+.idea/
+*.log
+data/
+logs/
+*.db
+*.db-wal
+*.db-shm

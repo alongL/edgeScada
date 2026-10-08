@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EdgeSCADA FEP - 前置通信采集机现场运维诊断</title>
+    <style>
+        :root {
+            --bg-primary: #0a0f1d;
+            --bg-card: #131b2e;
+            --border: #233352;
+            --text-main: #f1f5f9;
+            --text-muted: #94a3b8;
+            --accent: #38bdf8;
+            --green: #22c55e;
+            --red: #ef4444;
+            --yellow: #f59e0b;
+        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, monospace;
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            padding: 24px;
+            line-height: 1.5;
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 24px;
+        }
+        .logo-badge {
+            background: linear-gradient(135deg, #0284c7, #38bdf8);
+            color: #0b1120;
+            font-weight: 800;
+            font-size: 16px;
+            padding: 4px 12px;
+            border-radius: 6px;
+            letter-spacing: 1px;
+        }
+        .title h1 { font-size: 20px; font-weight: 700; }
+        .title p { font-size: 12px; color: var(--text-muted); }
+        .notice-banner {
+            background: rgba(56, 189, 248, 0.1);
+            border: 1px solid rgba(56, 189, 248, 0.3);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 13px;
+            color: #7dd3fc;
+            margin-bottom: 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .notice-btn {
+            background: var(--accent);
+            color: #080e1a;
+            border: none;
+            padding: 6px 14px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-decoration: none;
+            font-size: 12px;
+        }
+        .grid-4 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            padding: 18px;
+        }
+        .card-label { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; }
+        .card-val { font-size: 26px; font-weight: 700; font-family: monospace; color: var(--text-main); }
+        .card-sub { font-size: 11px; color: var(--text-muted); margin-top: 4px; }
+        
+        .main-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 20px; }
+        @media (max-width: 900px) { .main-layout { grid-template-columns: 1fr; } }
+
+        table { width: 100%; border-collapse: collapse; font-size: 13px; text-align: left; }
+        th { background: rgba(8, 14, 26, 0.6); padding: 10px 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); }
+        td { padding: 10px 12px; border-bottom: 1px solid rgba(35, 51, 82, 0.4); }
+        .badge { padding: 2px 6px; border-radius: 4px; font-size: 11px; font-weight: 600; }
+        .badge.green { background: rgba(34, 197, 94, 0.15); color: #4ade80; }
+        .badge.red { background: rgba(239, 68, 68, 0.15); color: #f87171; }
+        
+        .diag-item { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid rgba(35, 51, 82, 0.4); font-size: 13px; }
+        .diag-k { color: var(--text-muted); }
+        .diag-v { font-weight: 600; font-family: monospace; color: #f1f5f9; }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <div style="display: flex; align-items: center; gap: 12px;">
+            <div class="logo-badge">FEP-AGENT</div>
+            <div class="title">
+                <h1>EdgeSCADA FEP 现场前置机通信诊断终端</h1>
+                <p>硬件前置节点独立运维通道 · Modbus 总线抖动与请求聚合深度诊断 (Port 8081)</p>
+            </div>
+        </div>
+        <div>
+            <span class="badge green" id="status-pill">● 周期对齐采集中</span>
+        </div>
+    </div>
+
+    <!-- 顶部醒目横幅：提示去 8888 看调度大屏 -->
+    <div class="notice-banner">
+        <div>
+            🛠️ <strong>当前页面为前置机专用本地硬件诊断台</strong>（不对外网开放）。如需查看整场动力学大屏、实时越限报警及历史时序归档，请访问中控服务。
+        </div>
+        <a href="http://localhost:8888" target="_blank" class="notice-btn">打开 SCADA 调度大屏 (8888) ➔</a>
+    </div>
+
+    <!-- 4 个前置核心通信指标 -->
+    <div class="grid-4">
+        <div class="card">
+            <div class="card-label">微秒级对齐抖动 (Cycle Jitter)</div>
+            <div id="m-jitter" class="card-val" style="color: #38bdf8;">-- ms</div>
+            <div class="card-sub">硬整秒时间推进绝对偏差</div>
+        </div>
+        <div class="card">
+            <div class="card-label">总线单轮往返耗时 (Duration)</div>
+            <div id="m-dur" class="card-val" style="color: #4ade80;">-- ms</div>
+            <div class="card-sub">Modbus TCP 物理请求与解析耗时</div>
+        </div>
+        <div class="card">
+            <div class="card-label">请求合并块数 (Merged Blocks)</div>
+            <div id="m-blocks" class="card-val">--</div>
+            <div class="card-sub">AutoCoalesce 自动聚类后的报文包数</div>
+        </div>
+        <div class="card">
+            <div class="card-label">采集成功 / 失败总轮次</div>
+            <div id="m-cycles" class="card-val">-- / --</div>
+            <div class="card-sub">系统稳定性计数</div>
+        </div>
+    </div>
+
+    <div class="main-layout">
+        <!-- 左侧：前置现场原始测点与寄存器镜像 -->
+        <div class="card">
+            <div style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">📡 现场设备原始采样数据表 (Raw Modbus Telemetry)</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>测点名称</th>
+                        <th>工程量数值</th>
+                        <th>物理单位</th>
+                        <th>质量戳</th>
+                        <th>最后采样时刻</th>
+                    </tr>
+                </thead>
+                <tbody id="points-body">
+                    <tr><td colspan="5" style="text-align:center; color: var(--text-muted);">正在读取 Modbus 寄存器...</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 右侧：前置机网络拓扑与上行通道健康度 -->
+        <div class="card">
+            <div style="font-size: 15px; font-weight: 700; margin-bottom: 14px;">⚙️ 通信拓扑与总线健康度 (Bus Health)</div>
+            <div class="diag-item">
+                <span class="diag-k">南向物理通道协议</span>
+                <span class="diag-v">Modbus TCP (Slave 1)</span>
+            </div>
+            <div class="diag-item">
+                <span class="diag-k">南向目标端口</span>
+                <span class="diag-v">127.0.0.1:1502</span>
+            </div>
+            <div class="diag-item">
+                <span class="diag-k">北向专线通道</span>
+                <span class="diag-v" style="color: #38bdf8;">CompactPack (KLV+Gzip)</span>
+            </div>
+            <div class="diag-item">
+                <span class="diag-k">北向中控目标</span>
+                <span class="diag-v">127.0.0.1:9000</span>
+            </div>
+            <div class="diag-item">
+                <span class="diag-k">请求合并算法状态</span>
+                <span class="diag-v" style="color: #4ade80;">AutoCoalesce ENABLED</span>
+            </div>
+            <div class="diag-item">
+                <span class="diag-k">时钟节拍控制方式</span>
+                <span class="diag-v" style="color: #4ade80;">PrecisionPacer (<0.1ms)</span>
+            </div>
+            <div class="diag-item">
+                <span class="diag-k">离线重发缓存队列</span>
+                <span class="diag-v">RingBuffer (10,000 Capacity)</span>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function refresh() {
+            try {
+                // 1. 获取 FEP 内部运行指标
+                const resStatus = await fetch('/api/status');
+                if (resStatus.ok) {
+                    const st = await resStatus.json();
+                    if (st.devices && st.devices.length > 0) {
+                        const d = st.devices[0];
+                        document.getElementById('m-jitter').innerText = (Math.abs(d.last_jitter_us) / 1000.0).toFixed(3) + ' ms';
+                        document.getElementById('m-dur').innerText = d.last_duration_ms.toFixed(2) + ' ms';
+                        document.getElementById('m-blocks').innerText = d.blocks + ' 块 (10点)';
+                        document.getElementById('m-cycles').innerText = d.success_cycles + ' / ' + d.failed_cycles;
+                    }
+                }
+
+                // 2. 获取原始测点
+                const resPoints = await fetch('/api/points');
+                if (resPoints.ok) {
+                    const pts = await resPoints.json();
+                    let html = '';
+                    for (const p of pts) {
+                        const d = new Date(p.timestamp_ms);
+                        const tstr = d.toLocaleTimeString() + '.' + String(d.getMilliseconds()).padStart(3, '0');
+                        html += `<tr>
+                            <td><strong>${p.name}</strong></td>
+                            <td style="font-family: monospace; color: var(--accent); font-weight: 700;">${p.value.toFixed(2)}</td>
+                            <td>${p.unit || '-'}</td>
+                            <td><span class="badge green">GOOD (192)</span></td>
+                            <td style="color: var(--text-muted);">${tstr}</td>
+                        </tr>`;
+                    }
+                    document.getElementById('points-body').innerHTML = html;
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }
+        setInterval(refresh, 1000);
+        refresh();
+    </script>
+</body>
+</html>

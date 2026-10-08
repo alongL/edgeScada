@@ -1,0 +1,14 @@
+# ==============================================================================
+# EdgePlus 工业测点模板 (Excel / CSV 格式)
+# 格式规范: 测点名称, 功能码, 寄存器地址[:位偏移], 数据类型, 比例系数, 偏移量, 工程单位, 描述
+# ==============================================================================
+active_power, 3, 100, float32_cdab, 1.0, 0.0, kW, 机组有功功率
+reactive_power, 3, 102, float32_cdab, 1.0, 0.0, kvar, 机组无功功率
+grid_voltage_a, 3, 104, float32_cdab, 1.0, 0.0, V, A相电网电压
+grid_current_a, 3, 106, float32_cdab, 1.0, 0.0, A, A相电网电流
+grid_frequency, 3, 108, float32_cdab, 1.0, 0.0, Hz, 电网工频
+inverter_temp, 3, 110, int16, 0.1, 0.0, ℃, 变流器IGBT温度
+daily_energy, 3, 112, uint32_abcd, 0.1, 0.0, kWh, 当日累计发电量
+running_state, 3, 120:0, boolean, 1.0, 0.0, , 机组运行状态 (寄存器120第0位)
+fault_state, 3, 120:1, boolean, 1.0, 0.0, , 机组综合故障 (寄存器120第1位)
+power_factor, 3, 122, float32_cdab, 1.0, 0.0, , 功率因数

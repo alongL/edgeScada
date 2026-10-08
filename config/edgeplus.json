@@ -1,0 +1,38 @@
+{
+  "server": {
+    "web_port": 8080,
+    "web_root": "./web"
+  },
+  "mqtt": {
+    "enabled": true,
+    "host": "127.0.0.1",
+    "port": 1883,
+    "client_id": "edgeplus_collector_01",
+    "topic_prefix": "edgeplus"
+  },
+  "devices": [
+    {
+      "id": "device_01",
+      "name": "Solar_Inverter_01",
+      "ip": "127.0.0.1",
+      "port": 1502,
+      "slave_id": 1,
+      "interval_ms": 1000,
+      "align_second": true,
+      "max_gap": 20,
+      "max_regs_per_req": 120,
+      "points": [
+        { "id": 1, "name": "active_power", "fc": 3, "reg": 100, "type": "float32_cdab", "unit": "kW", "scale": 1.0 },
+        { "id": 2, "name": "reactive_power", "fc": 3, "reg": 102, "type": "float32_cdab", "unit": "kvar", "scale": 1.0 },
+        { "id": 3, "name": "grid_voltage_a", "fc": 3, "reg": 104, "type": "float32_cdab", "unit": "V", "scale": 1.0 },
+        { "id": 4, "name": "grid_current_a", "fc": 3, "reg": 106, "type": "float32_cdab", "unit": "A", "scale": 1.0 },
+        { "id": 5, "name": "grid_frequency", "fc": 3, "reg": 108, "type": "float32_cdab", "unit": "Hz", "scale": 1.0 },
+        { "id": 6, "name": "inverter_temp", "fc": 3, "reg": 110, "type": "int16", "unit": "℃", "scale": 0.1 },
+        { "id": 7, "name": "daily_energy", "fc": 3, "reg": 112, "type": "uint32_abcd", "unit": "kWh", "scale": 0.1 },
+        { "id": 8, "name": "running_state", "fc": 3, "reg": 120, "type": "boolean", "bit": 0, "unit": "" },
+        { "id": 9, "name": "fault_state", "fc": 3, "reg": 120, "type": "boolean", "bit": 1, "unit": "" },
+        { "id": 10, "name": "power_factor", "fc": 3, "reg": 122, "type": "float32_cdab", "unit": "", "scale": 1.0 }
+      ]
+    }
+  ]
+}
