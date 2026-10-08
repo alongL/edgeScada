@@ -170,7 +170,7 @@ An automated supervisor script is included in the root directory:
 ```
 
 - **Open SCADA Dashboard**: Navigate your browser to `http://localhost:8888`.
-- **Log Files**: Automatic logging to `logs/central.log` and `logs/fep.log`.
+- **Log Files**: Automatic logging to `logs/scada.log` and `logs/fep.log`.
 - **Graceful Shutdown**: Press `Ctrl + C` to safely terminate all child processes and commit SQLite transactions.
 
 ### 4.2 Manual Launch

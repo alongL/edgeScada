@@ -57,7 +57,7 @@ trap cleanup SIGINT SIGTERM EXIT
 
 # 1. 启动 SCADA 中控服务 (监听 9000 端口，Web 面板 8888 端口)
 echo "🚀 [1/2] 启动 SCADA 中控调度大脑 (edgescada)..."
-"${CENTRAL_BIN}" --tcp-port 9000 --web-port 8888 --web-dir "${SCRIPT_DIR}/web" --db "${SCRIPT_DIR}/data/scada.db" > "${SCRIPT_DIR}/logs/central.log" 2>&1 &
+"${CENTRAL_BIN}" --tcp-port 9000 --web-port 8888 --web-dir "${SCRIPT_DIR}/web" --db "${SCRIPT_DIR}/data/scada.db" > "${SCRIPT_DIR}/logs/scada.log" 2>&1 &
 CENTRAL_PID=$!
 echo "       -> 中控进程已启动 (PID: ${CENTRAL_PID})"
 echo "       -> 日志输出: logs/scada.log"
@@ -85,7 +85,7 @@ echo ""
 # 持续等待并监控子进程存活状态
 while true; do
     if ! kill -0 "${CENTRAL_PID}" 2>/dev/null; then
-        echo "⚠️ SCADA 中控服务意外退出！请检查 logs/central.log"
+        echo "⚠️ SCADA 中控服务意外退出！请检查 logs/scada.log"
         exit 1
     fi
     if ! kill -0 "${FEP_PID}" 2>/dev/null; then
